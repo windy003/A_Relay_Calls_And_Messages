@@ -4,8 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
 import android.widget.RadioGroup
@@ -90,6 +93,22 @@ class MainActivity : AppCompatActivity() {
         val i = Intent(this, NetService::class.java)
         ContextCompat.startForegroundService(this, i)
         Toast.makeText(this, "已启动", Toast.LENGTH_SHORT).show()
+        if (Prefs.getRole(this) == Prefs.SLAVE) {
+            requestIgnoreBatteryOptimizations()
+        }
+    }
+
+    /** 从机若不在电池优化白名单, 部分厂商 ROM 会在息屏一段时间后冻结/杀死后台服务,
+     *  导致主机来电时从机收不到推送、不响铃 */
+    private fun requestIgnoreBatteryOptimizations() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        try {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            })
+        } catch (_: Exception) {
+        }
     }
 
     private fun stopService() {

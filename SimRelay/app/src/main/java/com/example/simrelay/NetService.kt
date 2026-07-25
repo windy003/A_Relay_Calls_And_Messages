@@ -1,8 +1,12 @@
 package com.example.simrelay
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -79,6 +83,26 @@ class NetService : Service() {
             }
         } catch (e: Exception) {
             Log.w(TAG, "处理异常: ${e.message}")
+        }
+    }
+
+    /** App 被从"最近任务"划掉时, 部分厂商 ROM 会直接杀掉进程(前台服务也不例外);
+     *  这里用 AlarmManager 尽快把服务重新拉起来, 避免响铃功能失效 */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        if (Prefs.getRole(this) == Prefs.SLAVE && Prefs.isRunning(this)) {
+            val restartIntent = Intent(applicationContext, NetService::class.java)
+            val pi = PendingIntent.getService(
+                applicationContext, 1, restartIntent,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val am = getSystemService(ALARM_SERVICE) as AlarmManager
+            val triggerAt = SystemClock.elapsedRealtime() + 1000
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pi)
+            } else {
+                am.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pi)
+            }
         }
     }
 

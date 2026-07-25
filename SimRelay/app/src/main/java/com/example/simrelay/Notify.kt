@@ -10,6 +10,7 @@ import android.media.AudioAttributes
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
@@ -128,6 +129,13 @@ object Notify {
 
     /** 收到来电: 全屏拉起响铃界面 */
     fun incomingCall(c: Context, number: String) {
+        // 黑屏/Doze 状态下, 保证处理完到拉起 Activity 这段过程 CPU 不会又睡回去
+        try {
+            val pm = c.getSystemService(Context.POWER_SERVICE) as PowerManager
+            pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SimRelay:call").acquire(10_000L)
+        } catch (_: Exception) {
+        }
+
         val i = Intent(c, RingActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra("number", number)
