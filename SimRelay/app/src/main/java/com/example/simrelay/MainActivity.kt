@@ -1,6 +1,8 @@
 package com.example.simrelay
 
 import android.Manifest
+import android.app.ActivityManager
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -63,6 +65,10 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
             }
         }
+        findViewById<Button>(R.id.btnFullScreenIntent).setOnClickListener {
+            save()
+            openFullScreenIntentSettings()
+        }
 
         requestNeededPermissions()
         refresh()
@@ -111,16 +117,61 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Android 14 起, USE_FULL_SCREEN_INTENT 需要用户手动在设置里开启,
+     *  否则来电全屏通知会被系统降级, 锁屏/黑屏下不会弹出响铃界面 */
+    private fun canUseFullScreenIntent(): Boolean {
+        if (Build.VERSION.SDK_INT < 34) return true
+        val nm = getSystemService(NotificationManager::class.java)
+        return nm.canUseFullScreenIntent()
+    }
+
+    private fun openFullScreenIntentSettings() {
+        if (Build.VERSION.SDK_INT < 34) {
+            Toast.makeText(this, "当前系统版本无需单独开启", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (canUseFullScreenIntent()) {
+            Toast.makeText(this, "已开启", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                data = Uri.parse("package:$packageName")
+            })
+        } catch (_: Exception) {
+            startActivity(Intent(Settings.ACTION_SETTINGS))
+        }
+    }
+
     private fun stopService() {
         stopService(Intent(this, NetService::class.java))
         Prefs.setRunning(this, false)
         Toast.makeText(this, "已停止", Toast.LENGTH_SHORT).show()
     }
 
+    /** Prefs 里的"运行中"只是记忆的意图, 覆盖安装/进程被杀等情况下会跟实际状态脱节;
+     *  这里直接查系统里 NetService 是否真的活着做校正, 不依赖任何安装/开机广播的时机 */
+    private fun isNetServiceActuallyRunning(): Boolean {
+        return try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            am.getRunningServices(Int.MAX_VALUE).any { it.service.className == NetService::class.java.name }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun refresh() {
+        if (Prefs.isRunning(this) && !isNetServiceActuallyRunning()) {
+            Prefs.setRunning(this, false)
+        }
         val role = if (Prefs.getRole(this) == Prefs.MASTER) "主机" else "从机"
         val run = if (Prefs.isRunning(this)) "运行中" else "已停止"
-        tvStatus.text = "状态: $role · $run · 端口 ${Prefs.getPort(this)}"
+        var text = "状态: $role · $run · 端口 ${Prefs.getPort(this)}"
+        if (Prefs.getRole(this) == Prefs.SLAVE && !canUseFullScreenIntent()) {
+            text += "\n⚠ 未开启锁屏全屏来电权限, 来电时无法亮屏响铃, 请点上方按钮开启"
+        }
+        tvStatus.text = text
     }
 
     /** 返回 (IPv4 地址, 网卡名); 优先 wlan */

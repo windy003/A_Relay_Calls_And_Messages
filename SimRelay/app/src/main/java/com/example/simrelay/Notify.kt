@@ -7,8 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.Ringtone
-import android.media.RingtoneManager
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
@@ -26,7 +25,7 @@ object Notify {
     const val ID_CALL = 1001
     private var smsId = 2000
     private var notiId = 3000
-    @Volatile private var alertRingtone: Ringtone? = null
+    @Volatile private var alertPlayer: MediaPlayer? = null
 
     fun createChannels(c: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -71,31 +70,58 @@ object Notify {
     }
 
     /**
-     * 主动播放一次提示音. 走"铃声"声道(USAGE_NOTIFICATION_RINGTONE),
-     * 和来电响铃相同的声道 —— 既然来电能出声, 这条路在本机一定能出声,
-     * 不受"通知音量为 0 / 震动模式"影响.
+     * 主动播放一次提示音(短信/微信等转发通知共用), 用 assets 里指定的 mp3,
+     * 走"铃声"声道(USAGE_NOTIFICATION_RINGTONE), 和来电响铃相同的声道 ——
+     * 既然来电能出声, 这条路在本机一定能出声, 不受"通知音量为 0 / 震动模式"影响.
      */
     fun playAlert(c: Context) {
         try {
-            alertRingtone?.let { if (it.isPlaying) it.stop() }
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                ?: return
-            val rt = RingtoneManager.getRingtone(c.applicationContext, uri) ?: return
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                rt.audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
+            alertPlayer?.let { old ->
+                if (old.isPlaying) old.stop()
+                old.release()
             }
-            alertRingtone = rt
-            rt.play()
+            alertPlayer = null
+
+            val afd = c.resources.openRawResourceFd(R.raw.message_coming_male) ?: return
+            val mp = MediaPlayer()
+            afd.use { mp.setDataSource(it.fileDescriptor, it.startOffset, it.length) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                mp.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
+            mp.setOnCompletionListener { p ->
+                p.release()
+                if (alertPlayer === p) alertPlayer = null
+            }
+            mp.prepare()
+            mp.start()
+            alertPlayer = mp
+        } catch (_: Exception) {
+        }
+    }
+
+    /** 黑屏/锁屏下短信、App通知也要亮屏, 只是不像来电那样弹全屏 Activity:
+     *  用 SCREEN_BRIGHT_WAKE_LOCK + ACQUIRE_CAUSES_WAKEUP 直接点亮屏幕几秒,
+     *  让抬头通知能在锁屏上正常显示、出声 */
+    @Suppress("DEPRECATION")
+    private fun wakeScreenBriefly(c: Context) {
+        try {
+            val pm = c.getSystemService(Context.POWER_SERVICE) as PowerManager
+            pm.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "SimRelay:msg"
+            ).acquire(5_000L)
         } catch (_: Exception) {
         }
     }
 
     /** 收到转发的其它 App 通知(如微信) */
     fun incomingNoti(c: Context, app: String, title: String, body: String) {
+        wakeScreenBriefly(c)
         val contentTitle = if (title.isBlank()) app else "$app · $title"
         val n = NotificationCompat.Builder(c, CH_NOTI)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
@@ -104,6 +130,7 @@ object Notify {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setVibrate(longArrayOf(0, 400, 200, 400))
             .setLights(0xFF00FF00.toInt(), 500, 500)
             .setAutoCancel(true)
@@ -135,6 +162,10 @@ object Notify {
             pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SimRelay:call").acquire(10_000L)
         } catch (_: Exception) {
         }
+        // RingActivity 的 setTurnScreenOn 在部分机型(如三星)上不保证真的点亮屏幕:
+        // 实测出现过 Activity/通知已经弹出(showWhenLocked 生效), 但屏幕背光没亮,
+        // 用户要手动按电源键才看到已经在响铃 —— 这里主动点亮屏幕兜底
+        wakeScreenBriefly(c)
 
         val i = Intent(c, RingActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -169,6 +200,7 @@ object Notify {
 
     /** 收到短信: 弹通知显示内容 */
     fun incomingSms(c: Context, from: String, body: String) {
+        wakeScreenBriefly(c)
         val n = NotificationCompat.Builder(c, CH_SMS)
             .setSmallIcon(android.R.drawable.sym_action_email)
             .setContentTitle("主机短信 · $from")
@@ -176,6 +208,7 @@ object Notify {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH) // 抬头(heads-up)提醒
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 锁屏亮屏界面上也显示完整内容, 不被折叠成"新通知"
             .setVibrate(longArrayOf(0, 400, 200, 400))
             .setLights(0xFF00FF00.toInt(), 500, 500)
             .setAutoCancel(true)
