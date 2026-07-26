@@ -124,7 +124,7 @@ object Notify {
         wakeScreenBriefly(c)
         val contentTitle = if (title.isBlank()) app else "$app · $title"
         val n = NotificationCompat.Builder(c, CH_NOTI)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(contentTitle)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -146,7 +146,7 @@ object Notify {
     /** 前台服务常驻通知 */
     fun foreground(c: Context): Notification {
         return NotificationCompat.Builder(c, CH_FG)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("SimRelay 运行中")
             .setContentText("角色: " + if (Prefs.getRole(c) == Prefs.MASTER) "主机" else "从机(端口 ${Prefs.getPort(c)})")
             .setOngoing(true)
@@ -177,7 +177,7 @@ object Notify {
         )
 
         val n = NotificationCompat.Builder(c, CH_CALL)
-            .setSmallIcon(android.R.drawable.sym_call_incoming)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("主机来电")
             .setContentText(number)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -202,7 +202,7 @@ object Notify {
     fun incomingSms(c: Context, from: String, body: String) {
         wakeScreenBriefly(c)
         val n = NotificationCompat.Builder(c, CH_SMS)
-            .setSmallIcon(android.R.drawable.sym_action_email)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("主机短信 · $from")
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
