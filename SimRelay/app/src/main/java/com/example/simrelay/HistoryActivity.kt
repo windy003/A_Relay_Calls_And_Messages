@@ -1,6 +1,8 @@
 package com.example.simrelay
 
 import android.app.AlertDialog
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -19,8 +21,14 @@ class HistoryActivity : AppCompatActivity() {
     private lateinit var listView: ListView
     private lateinit var tvEmpty: TextView
     private lateinit var adapter: MsgAdapter
+    private lateinit var btnAll: Button
+    private lateinit var btnSms: Button
+    private lateinit var btnNoti: Button
     private var filter: String = "all" // all / sms / noti
     private val fmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
+
+    private val highlightTint = ColorStateList.valueOf(Color.parseColor("#2196F3"))
+    private var defaultTextColor: ColorStateList? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,9 +40,14 @@ class HistoryActivity : AppCompatActivity() {
         adapter = MsgAdapter()
         listView.adapter = adapter
 
-        findViewById<Button>(R.id.btnAll).setOnClickListener { filter = "all"; reload() }
-        findViewById<Button>(R.id.btnSms).setOnClickListener { filter = "sms"; reload() }
-        findViewById<Button>(R.id.btnNoti).setOnClickListener { filter = "noti"; reload() }
+        btnAll = findViewById(R.id.btnAll)
+        btnSms = findViewById(R.id.btnSms)
+        btnNoti = findViewById(R.id.btnNoti)
+        defaultTextColor = btnAll.textColors
+
+        btnAll.setOnClickListener { filter = "all"; reload() }
+        btnSms.setOnClickListener { filter = "sms"; reload() }
+        btnNoti.setOnClickListener { filter = "noti"; reload() }
         findViewById<Button>(R.id.btnClear).setOnClickListener { confirmClear() }
 
         reload()
@@ -54,6 +67,19 @@ class HistoryActivity : AppCompatActivity() {
         }
         adapter.setData(data)
         tvEmpty.visibility = if (data.isEmpty()) View.VISIBLE else View.GONE
+        updateFilterHighlight()
+    }
+
+    private fun updateFilterHighlight() {
+        for ((key, btn) in listOf("all" to btnAll, "sms" to btnSms, "noti" to btnNoti)) {
+            if (key == filter) {
+                btn.backgroundTintList = highlightTint
+                btn.setTextColor(Color.WHITE)
+            } else {
+                btn.backgroundTintList = null
+                btn.setTextColor(defaultTextColor)
+            }
+        }
     }
 
     private fun confirmClear() {
