@@ -23,6 +23,7 @@ class RingActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -86,6 +87,18 @@ class RingActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         stopAndFinish()
+        if (instance === this) instance = null
         super.onDestroy()
+    }
+
+    companion object {
+        // 当前正在显示的响铃界面(从机同一时间只会有一个), 用来在收到 call_end 时远程关掉它
+        @Volatile private var instance: RingActivity? = null
+
+        /** 主机接听/挂断后调用: 关闭正在显示的响铃界面(可能从非 UI 线程调用) */
+        fun dismiss() {
+            val act = instance ?: return
+            Handler(Looper.getMainLooper()).post { act.stopAndFinish() }
+        }
     }
 }

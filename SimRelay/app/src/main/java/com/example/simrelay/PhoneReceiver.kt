@@ -18,21 +18,46 @@ class PhoneReceiver : BroadcastReceiver() {
         when (intent.action) {
             TelephonyManager.ACTION_PHONE_STATE_CHANGED -> {
                 val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
-                if (TelephonyManager.EXTRA_STATE_RINGING == state) {
-                    val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
-                        ?: "未知号码"
-                    // 同一次响铃系统可能回调多次, 用简单去重
-                    if (number == lastNumber &&
-                        System.currentTimeMillis() - lastCallTime < 3000
-                    ) return
-                    lastNumber = number
-                    lastCallTime = System.currentTimeMillis()
+                when (state) {
+                    TelephonyManager.EXTRA_STATE_RINGING -> {
+                        val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
+                            ?: "未知号码"
+                        // 同一次响铃系统可能回调多次, 用简单去重
+                        if (number == lastNumber &&
+                            System.currentTimeMillis() - lastCallTime < 3000
+                        ) return
+                        lastNumber = number
+                        lastCallTime = System.currentTimeMillis()
+                        ringSent = true
 
-                    val o = JSONObject()
-                    o.put("type", "call")
-                    o.put("number", number)
-                    Log.i("PhoneReceiver", "来电: $number")
-                    Sender.broadcast(context, o.toString())
+                        val o = JSONObject()
+                        o.put("type", "call")
+                        o.put("number", number)
+                        Log.i("PhoneReceiver", "来电: $number")
+                        Sender.broadcast(context, o.toString())
+                    }
+
+                    // 主机接听: 通知从机取消全屏响铃
+                    TelephonyManager.EXTRA_STATE_OFFHOOK -> {
+                        if (ringSent) {
+                            ringSent = false
+                            Log.i("PhoneReceiver", "主机已接听, 通知从机取消响铃")
+                            val o = JSONObject()
+                            o.put("type", "call_end")
+                            Sender.broadcast(context, o.toString())
+                        }
+                    }
+
+                    // 主机挂断/未接: 通知从机取消全屏响铃
+                    TelephonyManager.EXTRA_STATE_IDLE -> {
+                        if (ringSent) {
+                            ringSent = false
+                            Log.i("PhoneReceiver", "主机通话结束, 通知从机取消响铃")
+                            val o = JSONObject()
+                            o.put("type", "call_end")
+                            Sender.broadcast(context, o.toString())
+                        }
+                    }
                 }
             }
 
@@ -57,5 +82,7 @@ class PhoneReceiver : BroadcastReceiver() {
     companion object {
         private var lastNumber: String? = null
         private var lastCallTime: Long = 0
+        // 是否已经给从机发过 "call" 事件, 用来判断 OFFHOOK/IDLE 时要不要发 call_end
+        @Volatile private var ringSent = false
     }
 }

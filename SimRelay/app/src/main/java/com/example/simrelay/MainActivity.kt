@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
 
         showLocalIp()
 
-        findViewById<Button>(R.id.btnStart).setOnClickListener { save(); startService(); refresh() }
+        findViewById<Button>(R.id.btnStart).setOnClickListener { save(); startService(showToast = true); refresh() }
         findViewById<Button>(R.id.btnStop).setOnClickListener { stopService(); refresh() }
         findViewById<Button>(R.id.btnHistory).setOnClickListener {
             startActivity(Intent(this, HistoryActivity::class.java))
@@ -71,6 +71,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         requestNeededPermissions()
+        // 打开 App 时不管当前是主机还是从机角色, 都自动拉起服务, 不需要用户手动点启动
+        startService(showToast = false)
         refresh()
     }
 
@@ -95,10 +97,10 @@ class MainActivity : AppCompatActivity() {
         Prefs.setPkgFilter(this, etPkgFilter.text.toString())
     }
 
-    private fun startService() {
+    private fun startService(showToast: Boolean) {
         val i = Intent(this, NetService::class.java)
         ContextCompat.startForegroundService(this, i)
-        Toast.makeText(this, "已启动", Toast.LENGTH_SHORT).show()
+        if (showToast) Toast.makeText(this, "已启动", Toast.LENGTH_SHORT).show()
         if (Prefs.getRole(this) == Prefs.SLAVE) {
             requestIgnoreBatteryOptimizations()
         }

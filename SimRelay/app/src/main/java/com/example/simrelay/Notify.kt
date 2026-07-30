@@ -198,6 +198,15 @@ object Notify {
         }
     }
 
+    /** 主机接听或挂断了电话: 取消全屏响铃通知, 并关掉正在显示的响铃界面 */
+    fun cancelCall(c: Context) {
+        try {
+            NotificationManagerCompat.from(c).cancel(ID_CALL)
+        } catch (_: Exception) {
+        }
+        RingActivity.dismiss()
+    }
+
     /** 收到短信: 弹通知显示内容 */
     fun incomingSms(c: Context, from: String, body: String) {
         wakeScreenBriefly(c)

@@ -65,6 +65,8 @@ class NetService : Service() {
                 val o = JSONObject(line)
                 when (o.optString("type")) {
                     "call" -> Notify.incomingCall(this, o.optString("number", "未知号码"))
+                    // 主机接听或挂断: 取消从机侧的全屏响铃
+                    "call_end" -> Notify.cancelCall(this)
                     "sms" -> {
                         val from = o.optString("from", "未知号码")
                         val body = o.optString("body", "")
