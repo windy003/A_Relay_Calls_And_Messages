@@ -122,7 +122,13 @@ object Notify {
     /** 收到转发的其它 App 通知(如微信) */
     fun incomingNoti(c: Context, app: String, title: String, body: String) {
         wakeScreenBriefly(c)
+        val id = notiId++
         val contentTitle = if (title.isBlank()) app else "$app · $title"
+        val pi = PendingIntent.getActivity(
+            c, id,
+            Intent(c, HistoryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val n = NotificationCompat.Builder(c, CH_NOTI)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(contentTitle)
@@ -133,12 +139,13 @@ object Notify {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setVibrate(longArrayOf(0, 400, 200, 400))
             .setLights(0xFF00FF00.toInt(), 500, 500)
+            .setContentIntent(pi)
             .setAutoCancel(true)
             .build()
 
         playAlert(c)
         try {
-            NotificationManagerCompat.from(c).notify(notiId++, n)
+            NotificationManagerCompat.from(c).notify(id, n)
         } catch (_: SecurityException) {
         }
     }
@@ -210,6 +217,12 @@ object Notify {
     /** 收到短信: 弹通知显示内容 */
     fun incomingSms(c: Context, from: String, body: String) {
         wakeScreenBriefly(c)
+        val id = smsId++
+        val pi = PendingIntent.getActivity(
+            c, id,
+            Intent(c, HistoryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val n = NotificationCompat.Builder(c, CH_SMS)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("主机短信 · $from")
@@ -220,12 +233,13 @@ object Notify {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 锁屏亮屏界面上也显示完整内容, 不被折叠成"新通知"
             .setVibrate(longArrayOf(0, 400, 200, 400))
             .setLights(0xFF00FF00.toInt(), 500, 500)
+            .setContentIntent(pi)
             .setAutoCancel(true)
             .build()
 
         playAlert(c)
         try {
-            NotificationManagerCompat.from(c).notify(smsId++, n)
+            NotificationManagerCompat.from(c).notify(id, n)
         } catch (_: SecurityException) {
         }
     }
