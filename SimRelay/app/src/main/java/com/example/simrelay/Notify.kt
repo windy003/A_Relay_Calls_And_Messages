@@ -156,7 +156,6 @@ object Notify {
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("SimRelay 运行中")
             .setContentText("角色: " + if (Prefs.getRole(c) == Prefs.MASTER) "主机" else "从机(端口 ${Prefs.getPort(c)})")
-            .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
