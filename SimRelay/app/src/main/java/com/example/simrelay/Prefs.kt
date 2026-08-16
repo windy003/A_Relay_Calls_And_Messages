@@ -23,8 +23,9 @@ object Prefs {
     fun isRunning(c: Context): Boolean = sp(c).getBoolean("running", false)
     fun setRunning(c: Context, v: Boolean) = sp(c).edit().putBoolean("running", v).apply()
 
-    /** 要转发通知的包名关键词, 逗号/换行分隔; 默认只转发微信; 留空=全部 App */
-    fun getPkgFilterRaw(c: Context): String = sp(c).getString("pkgfilter", "com.tencent.mm") ?: "com.tencent.mm"
+    /** 要转发通知的包名关键词, 逗号/换行分隔; 默认转发微信和安卓邮箱; 留空=全部 App */
+    private const val DEFAULT_PKG_FILTER = "com.tencent.mm\ncom.tencent.androidmail"
+    fun getPkgFilterRaw(c: Context): String = sp(c).getString("pkgfilter", DEFAULT_PKG_FILTER) ?: DEFAULT_PKG_FILTER
     fun setPkgFilter(c: Context, v: String) = sp(c).edit().putString("pkgfilter", v).apply()
     fun getPkgFilter(c: Context): List<String> = getPkgFilterRaw(c)
         .split(",", ";", "\n", " ")
