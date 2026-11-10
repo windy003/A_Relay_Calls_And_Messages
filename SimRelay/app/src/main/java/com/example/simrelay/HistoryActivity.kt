@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
@@ -11,6 +12,7 @@ import android.widget.Button
 import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,6 +30,7 @@ class HistoryActivity : AppCompatActivity() {
     private val fmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
 
     private val highlightTint = ColorStateList.valueOf(Color.parseColor("#2196F3"))
+    private var defaultBgTint: ColorStateList? = null
     private var defaultTextColor: ColorStateList? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,6 +46,7 @@ class HistoryActivity : AppCompatActivity() {
         btnAll = findViewById(R.id.btnAll)
         btnSms = findViewById(R.id.btnSms)
         btnNoti = findViewById(R.id.btnNoti)
+        defaultBgTint = ColorStateList.valueOf(resolveThemeColor(android.R.attr.colorButtonNormal))
         defaultTextColor = btnAll.textColors
 
         btnAll.setOnClickListener { filter = "all"; reload() }
@@ -76,10 +80,18 @@ class HistoryActivity : AppCompatActivity() {
                 btn.backgroundTintList = highlightTint
                 btn.setTextColor(Color.WHITE)
             } else {
-                btn.backgroundTintList = null
+                // 用主题的 colorButtonNormal 恢复, 置空会露出白色底图, 深色模式下出现白块
+                btn.backgroundTintList = defaultBgTint
                 btn.setTextColor(defaultTextColor)
             }
         }
+    }
+
+    /** 从当前主题取颜色, 自动适配深色/浅色模式 */
+    private fun resolveThemeColor(attrRes: Int): Int {
+        val tv = TypedValue()
+        theme.resolveAttribute(attrRes, tv, true)
+        return if (tv.resourceId != 0) ContextCompat.getColor(this, tv.resourceId) else tv.data
     }
 
     private fun confirmClear() {
